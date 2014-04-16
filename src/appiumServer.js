@@ -2,66 +2,79 @@ var spawn = require('child_process').spawn;
 var fs = require('fs');
 var path = require('path');
 
-function AppiumServer(port) {
-		this.port = port;
-		this.autConfig = {};
-		console.log(port);
-		this.autFile = path.join(__dirname, '../var', this.port.toString());
+String.prototype.trim = function() {
+	    return this.replace(/^\s+|\s+$/g, "");
 };
+
+function AppiumServer(port) {
+	this.port = port;
+	this.autConfig = {};
+	console.log(port);
+	this.autFile = path.join(__dirname, '../var', this.port.toString());
+};
+
+function date() {
+	return new Date().toISOString().replace(/T/, ' ').replace(/\..+/, '');
+}
+
+function log(tag, message) {
+	console.log(date() + ":" + "\t" + tag + "\t" + message.toString().replace(/^\s+|\s+$/g, ""));
+}
+
 
 AppiumServer.prototype.run = function () {
 	var _this = this;
 
 	fs.open(this.autFile, 'w', function (err, fd) {
-			if (err) {
-				console.log(err);
-				return;
-			} 
-			fs.close(fd);
-		});
+		if (err) {
+			console.log(err);
+			return;
+		} 
+		fs.close(fd);
+	});
 	this.child = spawn('appium', [], {
-			//detached : true,
-			});
+		//detached : true,
+	});
 
 	this.child.on('close', function (code, signal) {
-			console.log('child closed' + signal);
-			});
+		log('CHILD', signal);
+	});
 
 	this.child.stdout.on('data', function (data) {
-			console.log("[SERVER] " + new Date() + data);
-			});
+		log('SERVER', data);
+	});
 
 	this.child.stderr.on('data', function (data) {
-			var message = data.toString();
-			console.log('[SERVER] ' + new Date() + data);
+		var message = data.toString();
+		log('SERVER', data);
 
-			if (message.indexOf("desiredCapabilities") >= 0) {
-				console.log(message);
-				_this.parseAutConfig(message);
-			} else if (message.indexOf("am ") >= 0) {
-				console.log(message);
-				if (_this.autConfig['device'] == "selendroid") {
-					if (message.indexOf("am instrument -e main_activity") >= 0) {
-						var startTime = new Date();
-						_this.setAutStartTime(startTime);
-						fs.writeFile(_this.autFile, startTime.getTime(), function (err) {
-							console.log(err);
-							});
-						console.log(startTime.toString() + " " + startTime.getMilliseconds());
-					}
-				} else {
-					if (message.indexOf("am start -S") >= 0) {
-						var startTime = new Date();
-						_this.setAutStartTime(startTime);
-						fs.writeFile(_this.autFile, startTime.getTime(), function (err) {
-							console.log(err);
-							});
-						console.log(startTime.toString() + " " + startTime.getMilliseconds());
-					}
+		if (message.indexOf("desiredCapabilities") >= 0) {
+			log('SERVER', message);
+			_this.parseAutConfig(message);
+		} else if (message.indexOf("am ") >= 0) {
+			log('SERVER', message);
+			if (_this.autConfig['device'] == "selendroid") {
+				if (message.indexOf("am instrument -e main_activity") >= 0) {
+					var startTime = new Date();
+					_this.setAutStartTime(startTime);
+					fs.writeFile(_this.autFile, startTime.getTime(), function (err) {
+						log('SERVER', err);
+					});
+					log('SERVER', startTime.toString() + " " + startTime.getMilliseconds());
+				}
+			} else {
+				if (message.indexOf("am start -S") >= 0) {
+					var startTime = new Date();
+					_this.setAutStartTime(startTime);
+					fs.writeFile(_this.autFile, startTime.getTime(), function (err) {
+						log('SERVER', err);
+					});
+					log('SERVER', startTime.toString() + " " + startTime.getMilliseconds());
 				}
 			}
-		
-			});
+		}
+
+	});
 }
 
 AppiumServer.prototype.parseAutConfig = function (data) {
